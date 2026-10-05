@@ -64,6 +64,12 @@
           <span class="material-symbols-rounded">admin_panel_settings</span>
           <span>Admin Site</span>
         </button>
+        <div class="user-auth-slot" id="header-auth-container">
+          <button class="google-auth-btn" id="btn-header-login">
+            <span class="g-icon">G</span>
+            <span id="header-auth-btn-text">Sign In</span>
+          </button>
+        </div>
       </nav>
     </div>
   </header>
@@ -465,6 +471,59 @@
       <div class="modal-actions">
         <button class="secondary-btn" id="api-modal-cancel">Close</button>
         <button class="primary-btn" id="api-modal-save">Save & Reconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Authentication Modal -->
+  <div class="modal-backdrop" id="google-auth-modal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-icon-blue" style="background: #e8f0fe; color: #4285f4; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px;">
+          <span style="font-weight: 800; font-size: 1.35rem; font-family: sans-serif;">G</span>
+        </div>
+        <div>
+          <h3>Sign in with Google</h3>
+          <p>Connect your account to post advertisements and manage listings</p>
+        </div>
+      </div>
+      <div class="modal-body" id="auth-modal-body">
+        <div id="auth-login-options">
+          <button type="button" class="btn-google-primary" id="btn-modal-google-instant">
+            <span class="g-icon-large">G</span>
+            <span>Instant Google Sign-In</span>
+          </button>
+          
+          <div class="auth-divider">
+            <span>or sign in with custom profile</span>
+          </div>
+
+          <form id="custom-google-signin-form">
+            <div class="form-group">
+              <label class="form-label">Your Name</label>
+              <input type="text" id="auth-name-input" class="form-input" placeholder="e.g. Galib Mahmud" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Google Email</label>
+              <input type="email" id="auth-email-input" class="form-input" placeholder="e.g. galib@gmail.com" required>
+            </div>
+            <button type="submit" class="secondary-btn" style="width: 100%; margin-top: 8px;">
+              Sign In with this Account
+            </button>
+          </form>
+        </div>
+
+        <div id="auth-profile-details" style="display: none; text-align: center; padding: 12px 0;">
+          <img id="auth-user-avatar" src="" alt="Avatar" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px; border: 2px solid var(--border-light); display: block;">
+          <h4 id="auth-user-name" style="font-size: 1.15rem; color: var(--primary-dark); margin-bottom: 4px; font-weight: 700;"></h4>
+          <p id="auth-user-email" style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 20px;"></p>
+          <button type="button" class="danger-outline-btn" id="btn-modal-user-logout" style="width: 100%;">
+            Sign Out
+          </button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary-btn" id="btn-auth-modal-close">Close</button>
       </div>
     </div>
   </div>

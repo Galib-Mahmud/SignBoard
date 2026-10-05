@@ -92,6 +92,9 @@ class ApiService {
         'google_id': googleId ?? 'google_signboard_demo',
         'avatar_url': avatarUrl ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
       }),
+    ).timeout(
+      const Duration(seconds: 35),
+      onTimeout: () => throw Exception('Server connection timed out. The cloud server may be waking up, please retry.'),
     );
 
     if (response.statusCode == 200) {
@@ -104,7 +107,7 @@ class ApiService {
       await prefs.setString(_userKey, jsonEncode(_currentUser!.toJson()));
       return _currentUser!;
     } else {
-      throw Exception('Failed to sign in: ${response.body}');
+      throw Exception('Server responded with status ${response.statusCode}: ${response.body}');
     }
   }
 

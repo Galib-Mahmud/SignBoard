@@ -6,27 +6,18 @@
 const RENDER_PROD_API = 'https://signboard-backend.onrender.com/api';
 
 function resolveApiBase() {
-  const isHttps = window.location.protocol === 'https:';
-  const isVercel = window.location.hostname.includes('vercel.app');
   const stored = localStorage.getItem('signboard_api_base');
-  
-  // If on Vercel or remote HTTPS, strictly use live Render cloud
-  if (isHttps || isVercel) {
-    if (!stored || !stored.startsWith('https://')) {
-      localStorage.setItem('signboard_api_base', RENDER_PROD_API);
-      return RENDER_PROD_API;
-    }
+  if (stored && (stored.startsWith('https://') || stored.startsWith('http://'))) {
     return stored;
   }
-  
-  // On localhost:
-  return stored || 'http://127.0.0.1:8000/api';
+  return RENDER_PROD_API;
 }
 
 // State Management
 const STATE = {
   apiBase: resolveApiBase(),
   authToken: localStorage.getItem('signboard_auth_token') || '',
+  currentUser: JSON.parse(localStorage.getItem('signboard_user') || 'null'),
   adminToken: localStorage.getItem('signboard_admin_token') || '',
   adminUser: JSON.parse(localStorage.getItem('signboard_admin_user') || 'null'),
   
@@ -41,12 +32,15 @@ const STATE = {
   selectedCategory: 'all',
   searchQuery: '',
   sortBy: 'recent',
+  currentPage: 1,
+  hasNextPage: false,
+  totalPostsCount: 0,
   
   posts: [],
   savedPosts: JSON.parse(localStorage.getItem('signboard_saved_ids') || '[]'),
   myPosts: [],
   
-  isBackendLive: false,
+  isBackendLive: true,
 };
 
 // DOM Element References
@@ -132,6 +126,27 @@ const DOM = {
   
   // Toast Hub
   toastHub: document.getElementById('toast-hub'),
+
+  // Google Auth
+  headerAuthContainer: document.getElementById('header-auth-container'),
+  btnHeaderLogin: document.getElementById('btn-header-login'),
+  headerAuthBtnText: document.getElementById('header-auth-btn-text'),
+  googleAuthModal: document.getElementById('google-auth-modal'),
+  btnModalGoogleInstant: document.getElementById('btn-modal-google-instant'),
+  customGoogleForm: document.getElementById('custom-google-signin-form'),
+  authNameInput: document.getElementById('auth-name-input'),
+  authEmailInput: document.getElementById('auth-email-input'),
+  authLoginOptions: document.getElementById('auth-login-options'),
+  authProfileDetails: document.getElementById('auth-profile-details'),
+  authUserAvatar: document.getElementById('auth-user-avatar'),
+  authUserName: document.getElementById('auth-user-name'),
+  authUserEmail: document.getElementById('auth-user-email'),
+  btnModalUserLogout: document.getElementById('btn-modal-user-logout'),
+  btnAuthModalClose: document.getElementById('btn-auth-modal-close'),
+
+  // Pagination & Load More
+  feedLoader: document.getElementById('feed-loader'),
+  btnLoadMore: document.getElementById('btn-load-more'),
 };
 
 // ==========================================
@@ -139,10 +154,11 @@ const DOM = {
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
   initGeolocation();
+  initGoogleAuthUI();
   bindEvents();
   await checkBackendStatus();
   await loadCategories();
-  await loadFeedPosts();
+  await loadFeedPosts(1, false);
   await loadMyPosts();
   updateSavedBadge();
   
@@ -192,94 +208,177 @@ function recalculateDistances() {
   STATE.posts.forEach(p => {
     p.distance_km = calculateDistance(STATE.userLocation.lat, STATE.userLocation.lng, p.latitude, p.longitude);
   });
-  renderFeed();
+  renderCards(STATE.posts, DOM.postsContainer);
 }
 
 // ==========================================
 // Backend Health Check & Auth
 // ==========================================
-async function checkBackendStatus() {
-  // If on HTTPS and apiBase is http://, auto-upgrade to Render live URL
-  if (window.location.protocol === 'https:' && STATE.apiBase.startsWith('http://')) {
-    STATE.apiBase = RENDER_PROD_API;
-    localStorage.setItem('signboard_api_base', RENDER_PROD_API);
-  }
-
-  try {
-    const res = await fetch(`${STATE.apiBase}/categories/`, { signal: AbortSignal.timeout(8000) });
-    if (res.ok) {
-      STATE.isBackendLive = true;
+function setBackendStatus(isLive) {
+  STATE.isBackendLive = isLive;
+  if (DOM.apiDot && DOM.apiLabel) {
+    if (isLive) {
       DOM.apiDot.className = 'status-indicator live';
       DOM.apiLabel.textContent = STATE.apiBase.includes('localhost') || STATE.apiBase.includes('127.0.0.1')
         ? 'Backend: Live (Local)'
         : 'Backend: Live (Render Cloud)';
+    } else {
+      DOM.apiDot.className = 'status-indicator';
+      DOM.apiLabel.textContent = 'Backend: Connecting...';
+    }
+  }
+}
+
+async function checkBackendStatus() {
+  try {
+    const res = await fetch(`${STATE.apiBase}/categories/`);
+    if (res.ok) {
+      setBackendStatus(true);
       return true;
     }
   } catch (err) {
-    console.warn('Backend not reachable at:', STATE.apiBase, err);
+    console.warn('Backend ping failed on', STATE.apiBase, err);
   }
   
-  // Fallback to Render cloud if local failed
   if (!STATE.apiBase.includes('onrender.com')) {
     try {
-      const res = await fetch(`${RENDER_PROD_API}/categories/`, { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(`${RENDER_PROD_API}/categories/`);
       if (res.ok) {
         STATE.apiBase = RENDER_PROD_API;
         localStorage.setItem('signboard_api_base', RENDER_PROD_API);
-        STATE.isBackendLive = true;
-        DOM.apiDot.className = 'status-indicator live';
-        DOM.apiLabel.textContent = 'Backend: Live (Render Cloud)';
+        setBackendStatus(true);
         return true;
       }
     } catch (_) {}
   }
   
-  STATE.isBackendLive = false;
-  DOM.apiDot.className = 'status-indicator';
-  DOM.apiLabel.textContent = 'Backend: Offline (Demo Mode)';
+  setBackendStatus(false);
   return false;
 }
 
-// Ensure demo user auth token exists
-async function ensureAuthToken() {
-  if (STATE.authToken) return STATE.authToken;
+// Google Authentication Logic
+function initGoogleAuthUI() {
+  if (!DOM.headerAuthContainer) return;
+
+  if (STATE.currentUser && STATE.authToken) {
+    DOM.headerAuthContainer.innerHTML = `
+      <button class="google-auth-btn" id="btn-header-login" title="Account Settings">
+        <img src="${STATE.currentUser.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}" class="header-user-avatar" alt="Avatar">
+        <span>${escapeHtml(STATE.currentUser.first_name || STATE.currentUser.username || 'Account')}</span>
+      </button>
+    `;
+  } else {
+    DOM.headerAuthContainer.innerHTML = `
+      <button class="google-auth-btn" id="btn-header-login">
+        <span class="g-icon">G</span>
+        <span>Sign In</span>
+      </button>
+    `;
+  }
+
+  const btnLogin = document.getElementById('btn-header-login');
+  if (btnLogin) {
+    btnLogin.addEventListener('click', openGoogleAuthModal);
+  }
+}
+
+function openGoogleAuthModal() {
+  if (!DOM.googleAuthModal) return;
+  DOM.googleAuthModal.style.display = 'flex';
+
+  if (STATE.currentUser && STATE.authToken) {
+    DOM.authLoginOptions.style.display = 'none';
+    DOM.authProfileDetails.style.display = 'block';
+    DOM.authUserAvatar.src = STATE.currentUser.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+    DOM.authUserName.textContent = `${STATE.currentUser.first_name || ''} ${STATE.currentUser.last_name || ''}`.trim() || STATE.currentUser.username;
+    DOM.authUserEmail.textContent = STATE.currentUser.email || 'Google User';
+  } else {
+    DOM.authLoginOptions.style.display = 'block';
+    DOM.authProfileDetails.style.display = 'none';
+  }
+}
+
+function closeGoogleAuthModal() {
+  if (DOM.googleAuthModal) {
+    DOM.googleAuthModal.style.display = 'none';
+  }
+}
+
+async function handleGoogleSignIn({ email, name, avatarUrl, googleId }) {
   try {
+    showToast('Signing in with Google...', 'info');
     const res = await fetch(`${STATE.apiBase}/auth/google/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'maya.j@example.com',
-        name: 'Maya Johnson',
-        google_id: 'demo_guest_user',
+        email: email || 'galib.mahmud@gmail.com',
+        name: name || 'Galib Mahmud',
+        avatar_url: avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+        google_id: googleId || `goog_${Date.now()}`,
       })
     });
+
     if (res.ok) {
       const data = await res.json();
       STATE.authToken = data.token;
+      STATE.currentUser = data.user;
       localStorage.setItem('signboard_auth_token', data.token);
-      return data.token;
+      localStorage.setItem('signboard_user', JSON.stringify(data.user));
+      
+      initGoogleAuthUI();
+      closeGoogleAuthModal();
+      showToast(`Welcome, ${data.user.first_name || data.user.username}!`, 'success');
+      loadMyPosts();
+      return true;
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(`Sign in failed: ${JSON.stringify(err)}`, 'error');
+      return false;
     }
-  } catch (e) {
-    console.warn('Auth fallback to demo token');
+  } catch (err) {
+    showToast('Failed to connect to authentication server. Please retry.', 'error');
+    console.error(err);
+    return false;
   }
-  return 'demo_token';
+}
+
+function handleUserLogout() {
+  STATE.authToken = '';
+  STATE.currentUser = null;
+  localStorage.removeItem('signboard_auth_token');
+  localStorage.removeItem('signboard_user');
+  initGoogleAuthUI();
+  closeGoogleAuthModal();
+  showToast('Signed out successfully.', 'info');
+  loadMyPosts();
+}
+
+// Ensure user auth token exists for ad creation
+async function ensureAuthToken() {
+  if (STATE.authToken) return STATE.authToken;
+  await handleGoogleSignIn({
+    email: 'maya.j@example.com',
+    name: 'Maya Johnson',
+    googleId: 'demo_guest_user',
+  });
+  return STATE.authToken || 'demo_token';
 }
 
 // ==========================================
 // Category Loading & Rendering
 // ==========================================
 async function loadCategories() {
-  if (STATE.isBackendLive) {
-    try {
-      const res = await fetch(`${STATE.apiBase}/categories/`);
-      if (res.ok) {
-        STATE.categories = await res.json();
-      }
-    } catch (_) {}
+  try {
+    const res = await fetch(`${STATE.apiBase}/categories/`);
+    if (res.ok) {
+      STATE.categories = await res.json();
+      setBackendStatus(true);
+    }
+  } catch (e) {
+    console.warn('Could not load categories:', e);
   }
   
   if (!STATE.categories || STATE.categories.length === 0) {
-    // High-fidelity fallback categories matching schema
     STATE.categories = [
       { id: 'tutoring', name: 'Tutoring', icon: 'school' },
       { id: 'teachers', name: 'Teachers', icon: 'person_outline' },
@@ -322,7 +421,7 @@ function renderCategoryPills() {
       document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       STATE.selectedCategory = cat.id;
-      filterAndRenderFeed();
+      loadFeedPosts(1, false);
     });
     DOM.catContainer.appendChild(btn);
   });
@@ -331,14 +430,12 @@ function renderCategoryPills() {
     document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
     document.getElementById('cat-pill-all').classList.add('active');
     STATE.selectedCategory = 'all';
-    filterAndRenderFeed();
+    loadFeedPosts(1, false);
   });
 }
 
 function renderCategoryDropdowns() {
-  // For Create Post Form
   DOM.postCategorySelect.innerHTML = '<option value="">-- Choose Category --</option>';
-  // For Admin Filter
   DOM.adminCatFilter.innerHTML = '<option value="">All Categories</option>';
   
   STATE.categories.forEach(cat => {
@@ -350,28 +447,85 @@ function renderCategoryDropdowns() {
 // ==========================================
 // Posts Fetching & Rendering
 // ==========================================
-async function loadFeedPosts() {
-  if (STATE.isBackendLive) {
-    try {
-      const url = `${STATE.apiBase}/posts/?latitude=${STATE.userLocation.lat}&longitude=${STATE.userLocation.lng}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        STATE.posts = (data.results || data).map(p => ({
-          ...p,
-          distance_km: p.distance_km || calculateDistance(STATE.userLocation.lat, STATE.userLocation.lng, p.latitude, p.longitude),
-        }));
-        filterAndRenderFeed();
-        return;
+async function loadFeedPosts(page = 1, append = false) {
+  const container = DOM.postsContainer;
+  const subtitleEl = document.getElementById('feed-subtitle');
+
+  if (!append) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 16px;">
+        <span class="material-symbols-rounded" style="font-size: 40px; color: var(--accent-blue); animation: spin 1s linear infinite; display: inline-block;">sync</span>
+        <p style="font-size: 0.92rem; color: var(--text-secondary); margin-top: 12px; font-weight: 500;">Loading signboards from live backend...</p>
+      </div>
+    `;
+  }
+
+  const queryParams = new URLSearchParams();
+  queryParams.set('page', page);
+  if (STATE.selectedCategory && STATE.selectedCategory !== 'all') {
+    queryParams.set('category', STATE.selectedCategory);
+  }
+  if (STATE.searchQuery.trim()) {
+    queryParams.set('search', STATE.searchQuery.trim());
+  }
+  if (STATE.userLocation.lat && STATE.userLocation.lng) {
+    queryParams.set('latitude', STATE.userLocation.lat);
+    queryParams.set('longitude', STATE.userLocation.lng);
+  }
+  if (STATE.sortBy) {
+    queryParams.set('sort', STATE.sortBy);
+  }
+
+  const url = `${STATE.apiBase}/posts/?${queryParams.toString()}`;
+
+  try {
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      const rawPosts = data.results || data;
+      const formattedPosts = rawPosts.map(p => ({
+        ...p,
+        distance_km: p.distance_km || calculateDistance(STATE.userLocation.lat, STATE.userLocation.lng, p.latitude, p.longitude),
+      }));
+
+      if (append) {
+        STATE.posts = [...STATE.posts, ...formattedPosts];
+      } else {
+        STATE.posts = formattedPosts;
       }
-    } catch (e) {
-      console.warn('Failed to load feed from live backend:', e);
+
+      STATE.currentPage = page;
+      STATE.hasNextPage = Boolean(data.next);
+      STATE.totalPostsCount = data.count || STATE.posts.length;
+
+      setBackendStatus(true);
+      renderCards(STATE.posts, container);
+
+      // Update subtitle
+      if (subtitleEl) {
+        const catObj = STATE.categories.find(c => c.id === STATE.selectedCategory);
+        const catName = catObj ? catObj.name : 'All Categories';
+        subtitleEl.textContent = `Showing ${STATE.posts.length} of ${STATE.totalPostsCount} listings in ${catName}`;
+      }
+
+      // Update Load More Button
+      if (DOM.feedLoader) {
+        DOM.feedLoader.style.display = STATE.hasNextPage ? 'flex' : 'none';
+      }
+      return;
+    }
+  } catch (err) {
+    console.warn('Live feed fetch failed:', err);
+  }
+
+  // If live fetch completely failed and we have no posts yet
+  if (!append && (!STATE.posts || STATE.posts.length === 0)) {
+    generateDemoPosts();
+    renderCards(STATE.posts, container);
+    if (subtitleEl) {
+      subtitleEl.textContent = 'Showing offline demo listings';
     }
   }
-  
-  // Seed fallback
-  generateDemoPosts();
-  filterAndRenderFeed();
 }
 
 function generateDemoPosts() {
@@ -422,32 +576,6 @@ function generateDemoPosts() {
       views_count: 98,
     },
   ];
-}
-
-function filterAndRenderFeed() {
-  let list = [...STATE.posts];
-  
-  if (STATE.selectedCategory !== 'all') {
-    list = list.filter(p => p.category_id === STATE.selectedCategory);
-  }
-  
-  if (STATE.searchQuery.trim()) {
-    const q = STATE.searchQuery.toLowerCase();
-    list = list.filter(p => 
-      p.title.toLowerCase().includes(q) ||
-      (p.description && p.description.toLowerCase().includes(q)) ||
-      (p.category_name && p.category_name.toLowerCase().includes(q)) ||
-      (p.address && p.address.toLowerCase().includes(q))
-    );
-  }
-  
-  if (STATE.sortBy === 'distance') {
-    list.sort((a, b) => parseFloat(a.distance_km || 999) - parseFloat(b.distance_km || 999));
-  } else if (STATE.sortBy === 'views') {
-    list.sort((a, b) => (b.views_count || 0) - (a.views_count || 0));
-  }
-  
-  renderCards(list, DOM.postsContainer);
 }
 
 function renderCards(postsList, targetElement, isMyPosts = false) {
@@ -1248,24 +1376,64 @@ function bindEvents() {
     }
   });
   
-  // Search
-  DOM.searchInput.addEventListener('input', () => {
+  // Search (Debounced API fetch)
+  DOM.searchInput.addEventListener('input', debounce(() => {
     STATE.searchQuery = DOM.searchInput.value;
     DOM.btnClearSearch.style.display = STATE.searchQuery ? 'flex' : 'none';
-    filterAndRenderFeed();
-  });
+    loadFeedPosts(1, false);
+  }, 350));
+
   DOM.btnClearSearch.addEventListener('click', () => {
     DOM.searchInput.value = '';
     STATE.searchQuery = '';
     DOM.btnClearSearch.style.display = 'none';
-    filterAndRenderFeed();
+    loadFeedPosts(1, false);
   });
   
   // Sort
   DOM.sortSelect.addEventListener('change', () => {
     STATE.sortBy = DOM.sortSelect.value;
-    filterAndRenderFeed();
+    loadFeedPosts(1, false);
   });
+
+  // Load More Posts Pagination
+  if (DOM.btnLoadMore) {
+    DOM.btnLoadMore.addEventListener('click', () => {
+      if (STATE.hasNextPage) {
+        loadFeedPosts(STATE.currentPage + 1, true);
+      }
+    });
+  }
+
+  // Google Auth Modal Events
+  if (DOM.btnModalGoogleInstant) {
+    DOM.btnModalGoogleInstant.addEventListener('click', () => {
+      handleGoogleSignIn({
+        email: 'galib.mahmud@gmail.com',
+        name: 'Galib Mahmud',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      });
+    });
+  }
+
+  if (DOM.customGoogleForm) {
+    DOM.customGoogleForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = DOM.authNameInput.value.trim();
+      const email = DOM.authEmailInput.value.trim();
+      if (name && email) {
+        handleGoogleSignIn({ name, email });
+      }
+    });
+  }
+
+  if (DOM.btnModalUserLogout) {
+    DOM.btnModalUserLogout.addEventListener('click', handleUserLogout);
+  }
+
+  if (DOM.btnAuthModalClose) {
+    DOM.btnAuthModalClose.addEventListener('click', closeGoogleAuthModal);
+  }
   
   // Buttons
   DOM.btnCancelCreate.addEventListener('click', () => switchTab('feed'));

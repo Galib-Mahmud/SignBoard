@@ -14,27 +14,24 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
-  Future<void> _handleGoogleSignIn({bool isDemoMaya = true}) async {
+  Future<void> _handleGoogleSignIn({
+    String email = 'galib.mahmud@gmail.com',
+    String name = 'Galib Mahmud',
+    String? googleId,
+    String? avatarUrl,
+  }) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      if (isDemoMaya) {
-        await ApiService().googleSignIn(
-          email: 'maya.j@example.com',
-          name: 'Maya Johnson',
-          googleId: 'goog_maya_johnson_01',
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-        );
-      } else {
-        await ApiService().googleSignIn(
-          email: 'google.user@signboard.app',
-          name: 'SignBoard User',
-          googleId: 'goog_${DateTime.now().millisecondsSinceEpoch}',
-        );
-      }
+      await ApiService().googleSignIn(
+        email: email,
+        name: name,
+        googleId: googleId ?? 'goog_${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}',
+        avatarUrl: avatarUrl ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      );
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -44,7 +41,7 @@ class _AuthScreenState extends State<AuthScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Could not connect to backend: ${e.toString()}';
+          _errorMessage = e.toString().replaceAll('Exception:', '').trim();
         });
       }
     } finally {
@@ -52,6 +49,143 @@ class _AuthScreenState extends State<AuthScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showAccountPicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    child: const Text('G', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF4285F4))),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Choose an account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.primaryDark)),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text('to continue to SignBoard', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+              const Divider(height: 24),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE0E7FF),
+                  child: Text('GM', style: TextStyle(color: Color(0xFF3730A3), fontWeight: FontWeight.bold)),
+                ),
+                title: const Text('Galib Mahmud', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                subtitle: const Text('galib.mahmud@gmail.com', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _handleGoogleSignIn(
+                    email: 'galib.mahmud@gmail.com',
+                    name: 'Galib Mahmud',
+                    googleId: 'goog_galib_mahmud',
+                  );
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFFCE7F3),
+                  child: Text('MJ', style: TextStyle(color: Color(0xFF9D174D), fontWeight: FontWeight.bold)),
+                ),
+                title: const Text('Maya Johnson', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                subtitle: const Text('maya.j@example.com', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _handleGoogleSignIn(
+                    email: 'maya.j@example.com',
+                    name: 'Maya Johnson',
+                    googleId: 'goog_maya_johnson_01',
+                  );
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFF1F5F9),
+                  child: Icon(Icons.person_add_outlined, color: AppTheme.primaryDark, size: 20),
+                ),
+                title: const Text('Add custom Google account', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                subtitle: const Text('Enter your own name & email', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showCustomAccountDialog();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCustomAccountDialog() {
+    final nameCtrl = TextEditingController(text: 'Galib Mahmud');
+    final emailCtrl = TextEditingController(text: 'galib@gmail.com');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Sign in with Google Account', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Full Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emailCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Google Email',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final name = nameCtrl.text.trim();
+              final email = emailCtrl.text.trim();
+              if (name.isNotEmpty && email.isNotEmpty) {
+                Navigator.pop(ctx);
+                _handleGoogleSignIn(email: email, name: name);
+              }
+            },
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -154,7 +288,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    onTap: _isLoading ? null : () => _handleGoogleSignIn(isDemoMaya: true),
+                    onTap: _isLoading ? null : _showAccountPicker,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                       child: _isLoading
@@ -202,7 +336,12 @@ class _AuthScreenState extends State<AuthScreen> {
 
               // Alternative: Instant Guest Entry
               TextButton(
-                onPressed: _isLoading ? null : () => _handleGoogleSignIn(isDemoMaya: false),
+                onPressed: _isLoading
+                    ? null
+                    : () => _handleGoogleSignIn(
+                          email: 'guest_${DateTime.now().millisecondsSinceEpoch}@signboard.app',
+                          name: 'Guest Explorer',
+                        ),
                 child: const Text(
                   'Continue as Guest / New User',
                   style: TextStyle(
