@@ -43,6 +43,9 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _initializeApp() async {
     // 1. Initialize API service & local storage
     await ApiService().init();
+    if (ApiService().isAuthenticated) {
+      await ApiService().validateToken();
+    }
     // 2. Pre-fetch location in background
     LocationService().getCurrentLocation();
 

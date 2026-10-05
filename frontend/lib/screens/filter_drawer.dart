@@ -280,21 +280,20 @@ class _FilterDrawerState extends State<FilterDrawer> {
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
+      child: Material(
         color: isSelected ? AppTheme.goRouteBg : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: isSelected ? AppTheme.primaryDark : AppTheme.textSecondary,
+        child: ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          title: Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected ? AppTheme.primaryDark : AppTheme.textSecondary,
+            ),
           ),
-        ),
         trailing: count != null
             ? Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -308,7 +307,8 @@ class _FilterDrawerState extends State<FilterDrawer> {
                 ),
               )
             : null,
-        onTap: onTap,
+          onTap: onTap,
+        ),
       ),
     );
   }

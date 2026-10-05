@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/category_model.dart';
@@ -110,6 +108,23 @@ class ApiService {
     }
   }
 
+  Future<bool> validateToken() async {
+    if (_authToken == null || _authToken!.isEmpty) return false;
+    try {
+      final url = Uri.parse('$baseUrl/auth/profile/');
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode == 200) {
+        return true;
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
+        await logout();
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return true;
+    }
+  }
+
   Future<void> logout() async {
     _authToken = null;
     _currentUser = null;
@@ -120,13 +135,18 @@ class ApiService {
 
   Future<List<CategoryModel>> getCategories() async {
     final url = Uri.parse('$baseUrl/categories/');
-    final response = await http.get(url, headers: _headers);
+    var response = await http.get(url, headers: _headers);
+
+    if (response.statusCode == 401) {
+      await logout();
+      response = await http.get(url, headers: _headers);
+    }
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((json) => CategoryModel.fromJson(json)).toList();
     } else {
-      throw Exception('Failed to load categories');
+      throw Exception('Failed to load categories: ${response.statusCode}');
     }
   }
 
@@ -158,7 +178,12 @@ class ApiService {
     }
 
     final url = Uri.parse('$baseUrl/posts/').replace(queryParameters: queryParams);
-    final response = await http.get(url, headers: _headers);
+    var response = await http.get(url, headers: _headers);
+
+    if (response.statusCode == 401) {
+      await logout();
+      response = await http.get(url, headers: _headers);
+    }
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);

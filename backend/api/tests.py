@@ -137,3 +137,12 @@ class SignBoardAPITestCase(TestCase):
         self.assertEqual(res_del.status_code, status.HTTP_200_OK)
         self.assertFalse(Post.objects.filter(id=self.post.id).exists())
 
+    def test_invalid_token_does_not_block_public_endpoints(self):
+        # Client sends an old or invalid token header
+        self.client.credentials(HTTP_AUTHORIZATION='Token completely_stale_or_invalid_token_xyz')
+        cat_res = self.client.get(reverse('category_list'))
+        self.assertEqual(cat_res.status_code, status.HTTP_200_OK)
+
+        post_res = self.client.get(reverse('post_list_create'))
+        self.assertEqual(post_res.status_code, status.HTTP_200_OK)
+
