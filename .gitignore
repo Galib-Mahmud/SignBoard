@@ -1,0 +1,33 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+local_settings.py
+db.sqlite3
+staticfiles/
+media/
+*.log
+.env
+venv/
+env/
+ENV/
+
+# Flutter / Dart
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/.pub-cache/
+frontend/.pub/
+frontend/ios/Pods/
+frontend/.idea/
+
+# Editors & OS
+.DS_Store
+.vscode/
+*.swp
+*.swo

@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SignBoard — Hyperlocal Discovery & Classifieds Platform</title>
+  <meta name="description" content="Discover hyper-local services, tutoring, rentals, and classified signboards near you within walking distance. Connect directly via WhatsApp and Google Maps.">
+  <meta name="keywords" content="signboard, hyperlocal, classifieds, tutoring, rent rooms, services, bangladesh, dhaka">
+  
+  <!-- Modern Inter Font & Google Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Glassmorphic Navigation -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-group" id="btn-brand-home">
+        <div class="brand-logo">
+          <span class="material-symbols-rounded">signpost</span>
+        </div>
+        <div class="brand-text">
+          <h1 class="brand-title">SignBoard</h1>
+          <span class="brand-badge"><span class="pulse-dot"></span> Hyperlocal</span>
+        </div>
+      </div>
+
+      <!-- Live GPS & Backend Indicator -->
+      <div class="header-status-group">
+        <div class="gps-pill" id="btn-refresh-gps" title="Click to refresh your current GPS location">
+          <span class="material-symbols-rounded pill-icon">near_me</span>
+          <span id="gps-display-text">Locating...</span>
+        </div>
+        <div class="api-pill" id="btn-api-config" title="Configure Backend API Target">
+          <span class="status-indicator live" id="api-status-dot"></span>
+          <span id="api-label-text">Backend: Local / Render</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-links">
+        <button class="nav-tab active" data-tab="feed" id="tab-feed">
+          <span class="material-symbols-rounded">explore</span>
+          <span>Explore</span>
+        </button>
+        <button class="nav-tab" data-tab="saved" id="tab-saved">
+          <span class="material-symbols-rounded">bookmark</span>
+          <span>Saved (<span id="saved-counter">0</span>)</span>
+        </button>
+        <button class="nav-tab" data-tab="my-posts" id="tab-my-posts">
+          <span class="material-symbols-rounded">person_pin</span>
+          <span>My Posts (<span id="my-posts-counter">0</span>)</span>
+        </button>
+        <button class="nav-tab nav-tab-cta" data-tab="create" id="tab-create">
+          <span class="material-symbols-rounded">add_circle</span>
+          <span>Post Ad</span>
+        </button>
+        <button class="nav-tab nav-tab-admin" data-tab="admin" id="tab-admin">
+          <span class="material-symbols-rounded">admin_panel_settings</span>
+          <span>Admin Site</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-layout">
+    
+    <!-- Hero / Category & Search Bar (Visible on Feed) -->
+    <section class="discovery-section" id="discovery-bar">
+      <div class="search-bar-wrapper">
+        <span class="material-symbols-rounded search-icon">search</span>
+        <input type="text" id="global-search-input" placeholder="Search tutoring, flat rent, AC repair, used camera, car..." autocomplete="off">
+        <button class="clear-search-btn" id="btn-clear-search" style="display: none;">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+
+      <!-- Category Filter Pills Carousel -->
+      <div class="categories-scroll" id="categories-container">
+        <button class="cat-pill active" data-cat="all" id="cat-all">
+          <span class="material-symbols-rounded">grid_view</span>
+          <span>All Categories</span>
+        </button>
+        <!-- Populated dynamically from API -->
+      </div>
+    </section>
+
+    <!-- SECTION 1: FEED / EXPLORE -->
+    <section class="tab-content active" id="view-feed">
+      <div class="feed-header">
+        <div class="feed-meta">
+          <h2 class="feed-headline" id="feed-title">Nearby Signboards</h2>
+          <span class="feed-sub" id="feed-subtitle">Showing listings within 50 km of your coordinates</span>
+        </div>
+        <div class="feed-controls">
+          <select id="sort-select" class="custom-select">
+            <option value="recent">Sort: Most Recent</option>
+            <option value="distance">Sort: Nearest to Me</option>
+            <option value="views">Sort: Most Viewed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="cards-grid" id="posts-container">
+        <!-- Dynamic Post Cards -->
+      </div>
+
+      <div class="load-more-wrapper" id="feed-loader" style="display: none;">
+        <button class="secondary-btn" id="btn-load-more">Load More Posts</button>
+      </div>
+    </section>
+
+    <!-- SECTION 2: SAVED BOOKMARKS -->
+    <section class="tab-content" id="view-saved">
+      <div class="view-header">
+        <div>
+          <h2 class="view-headline">Bookmarked Signboards</h2>
+          <p class="view-sub">Items you have pinned for quick WhatsApp contact and navigation</p>
+        </div>
+      </div>
+      <div class="cards-grid" id="saved-posts-container">
+        <!-- Saved cards or empty state -->
+      </div>
+    </section>
+
+    <!-- SECTION 3: MY POSTS (With Delete One-by-One and Delete All) -->
+    <section class="tab-content" id="view-my-posts">
+      <div class="view-header my-posts-header">
+        <div>
+          <h2 class="view-headline">My Active Signboards</h2>
+          <p class="view-sub">Manage your published listings across categories</p>
+        </div>
+        <div class="action-buttons-group">
+          <button class="secondary-btn" id="btn-refresh-my-posts">
+            <span class="material-symbols-rounded">refresh</span>
+            <span>Refresh</span>
+          </button>
+          <button class="danger-outline-btn" id="btn-delete-all-my-posts">
+            <span class="material-symbols-rounded">delete_sweep</span>
+            <span>Delete All Posts</span>
+          </button>
+          <button class="primary-btn" id="btn-create-from-my-posts">
+            <span class="material-symbols-rounded">add</span>
+            <span>Post New Signboard</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="cards-grid" id="my-posts-container">
+        <!-- User posts rendered with individual delete buttons -->
+      </div>
+    </section>
+
+    <!-- SECTION 4: POST CREATION (STEP-BY-STEP CATEGORY FORM) -->
+    <section class="tab-content" id="view-create">
+      <div class="create-card-container">
+        <div class="create-header">
+          <h2 class="view-headline">Publish a Hyperlocal Signboard</h2>
+          <p class="view-sub">Standard structured data ensures instant discovery without heavy image bloat</p>
+        </div>
+
+        <form id="create-post-form" class="create-form">
+          <div class="form-group">
+            <label for="post-category" class="form-label">Select Standard Category *</label>
+            <select id="post-category" class="custom-select" required>
+              <option value="">-- Choose Category --</option>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="post-title" class="form-label" id="post-title-label">Signboard Title *</label>
+            <input type="text" id="post-title" class="form-input" placeholder="e.g. HSC Higher Math & Physics Home Tutor in Dhanmondi" required maxlength="255">
+            <span class="form-hint" id="post-title-hint">A concise, descriptive summary matching your selected category.</span>
+          </div>
+
+          <div class="form-group">
+            <label for="post-whatsapp" class="form-label">WhatsApp Contact Number *</label>
+            <div class="input-with-icon">
+              <span class="material-symbols-rounded input-icon-whatsapp">chat</span>
+              <input type="tel" id="post-whatsapp" class="form-input" placeholder="+8801712345678" required>
+            </div>
+            <span class="form-hint">Used for one-tap WhatsApp direct messaging. Include country code.</span>
+          </div>
+
+          <!-- Dynamic Category Fields Container -->
+          <div id="dynamic-category-fields" class="dynamic-fields-card">
+            <!-- Rendered automatically when category is selected -->
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <label for="post-desc" class="form-label">Detailed Description / Specifications *</label>
+              <button type="button" class="tag-btn" id="btn-use-example-desc">
+                <span class="material-symbols-rounded" style="font-size: 14px;">content_copy</span>
+                <span>Use Example Template</span>
+              </button>
+            </div>
+            <textarea id="post-desc" class="form-textarea" rows="8" placeholder="Provide background information, qualifications, conditions, schedule, or extra amenities..."></textarea>
+          </div>
+
+          <!-- Helpful Category Example Banner -->
+          <div id="example-desc-card" class="example-desc-card">
+            <div class="example-desc-header">
+              <span class="material-symbols-rounded">lightbulb</span>
+              <strong id="example-desc-cat-name">Example Format:</strong>
+            </div>
+            <pre id="example-desc-preview" class="example-desc-text"></pre>
+          </div>
+
+
+          <!-- Location Info -->
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="post-city" class="form-label">City *</label>
+              <input type="text" id="post-city" class="form-input" placeholder="e.g. Dhaka" required value="Dhaka">
+            </div>
+            <div class="form-group">
+              <label for="post-address" class="form-label">Area / Landmark *</label>
+              <input type="text" id="post-address" class="form-input" placeholder="e.g. Dhanmondi Road 27" required>
+            </div>
+          </div>
+
+          <div class="gps-notice-box">
+            <span class="material-symbols-rounded">my_location</span>
+            <div>
+              <strong>Automatic GPS Precision Capture:</strong>
+              <p id="create-gps-coordinates">Coordinates: 23.7538° N, 90.3776° E (Auto-detected from your device)</p>
+            </div>
+          </div>
+
+          <div class="form-submit-row">
+            <button type="button" class="secondary-btn" id="btn-cancel-create">Cancel</button>
+            <button type="submit" class="primary-btn" id="btn-submit-post">
+              <span class="material-symbols-rounded">publish</span>
+              <span>Publish Signboard Instantly</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- SECTION 5: PROFESSIONAL ADMIN DASHBOARD -->
+    <section class="tab-content" id="view-admin">
+      
+      <!-- Admin Login View (If not logged in as Admin) -->
+      <div id="admin-login-card" class="admin-auth-box">
+        <div class="admin-auth-header">
+          <div class="admin-badge-icon">
+            <span class="material-symbols-rounded">shield_person</span>
+          </div>
+          <h2>SignBoard Administrative Portal</h2>
+          <p>Sign in with staff credentials to moderate listings, manage users, and inspect real-time metrics.</p>
+        </div>
+
+        <form id="admin-login-form" class="admin-form">
+          <div class="form-group">
+            <label for="admin-user-input" class="form-label">Admin Username / Email</label>
+            <input type="text" id="admin-user-input" class="form-input" placeholder="admin" value="admin" required>
+          </div>
+          <div class="form-group">
+            <label for="admin-pass-input" class="form-label">Password</label>
+            <input type="password" id="admin-pass-input" class="form-input" placeholder="••••••••••••" value="adminpassword123" required>
+          </div>
+          <div class="form-hint" style="margin-bottom: 16px;">
+            Default Credentials: <code>admin</code> / <code>adminpassword123</code>
+          </div>
+          <button type="submit" class="primary-btn full-width" id="btn-admin-login">
+            <span class="material-symbols-rounded">login</span>
+            <span>Authenticate as Administrator</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Admin Dashboard Content (When authenticated) -->
+      <div id="admin-dashboard-view" style="display: none;">
+        
+        <!-- Admin Bar -->
+        <div class="admin-topbar">
+          <div>
+            <span class="badge-role">Staff Superuser</span>
+            <h2 class="view-headline">Platform Moderation Console</h2>
+            <p class="view-sub" id="admin-welcome-text">Logged in as Administrator</p>
+          </div>
+          <div class="admin-actions">
+            <button class="secondary-btn" id="btn-admin-refresh">
+              <span class="material-symbols-rounded">refresh</span>
+              <span>Refresh Metrics</span>
+            </button>
+            <button class="danger-outline-btn" id="btn-admin-logout">
+              <span class="material-symbols-rounded">logout</span>
+              <span>Log Out</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Metric Stat Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon-wrapper bg-blue">
+              <span class="material-symbols-rounded">dynamic_feed</span>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">Total Signboards</span>
+              <strong class="stat-value" id="stat-posts">0</strong>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon-wrapper bg-green">
+              <span class="material-symbols-rounded">group</span>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">Active Users</span>
+              <strong class="stat-value" id="stat-users">0</strong>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon-wrapper bg-amber">
+              <span class="material-symbols-rounded">category</span>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">Active Categories</span>
+              <strong class="stat-value" id="stat-categories">13</strong>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon-wrapper bg-purple">
+              <span class="material-symbols-rounded">visibility</span>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">Total Views</span>
+              <strong class="stat-value" id="stat-views">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Sub-Navigation -->
+        <div class="admin-subtabs">
+          <button class="admin-subtab active" data-subtab="posts" id="subtab-admin-posts">
+            <span class="material-symbols-rounded">list_alt</span>
+            <span>All Posts Moderation</span>
+          </button>
+          <button class="admin-subtab" data-subtab="users" id="subtab-admin-users">
+            <span class="material-symbols-rounded">manage_accounts</span>
+            <span>User Accounts & Permissions</span>
+          </button>
+        </div>
+
+        <!-- Subtab 1: Posts Moderation Table -->
+        <div class="admin-tab-pane active" id="admin-pane-posts">
+          <div class="table-filters-row">
+            <div class="search-bar-wrapper table-search">
+              <span class="material-symbols-rounded search-icon">search</span>
+              <input type="text" id="admin-posts-search" placeholder="Search any post by title, user, city, or phone...">
+            </div>
+            <select id="admin-posts-category-filter" class="custom-select" style="max-width: 220px;">
+              <option value="">All Categories</option>
+            </select>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title & Location</th>
+                  <th>Category</th>
+                  <th>Author</th>
+                  <th>WhatsApp</th>
+                  <th>Views</th>
+                  <th>Date</th>
+                  <th style="text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="admin-posts-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Subtab 2: User Moderation Table -->
+        <div class="admin-tab-pane" id="admin-pane-users">
+          <div class="table-filters-row">
+            <div class="search-bar-wrapper table-search">
+              <span class="material-symbols-rounded search-icon">search</span>
+              <input type="text" id="admin-users-search" placeholder="Search users by name, username or email...">
+            </div>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>User Profile</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Total Posts</th>
+                  <th>Joined</th>
+                  <th style="text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Reusable Confirmation Modal -->
+  <div class="modal-backdrop" id="confirm-modal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-danger-icon">
+          <span class="material-symbols-rounded">warning</span>
+        </div>
+        <div>
+          <h3 id="modal-title">Confirm Deletion</h3>
+          <p id="modal-subtitle">Are you sure you want to proceed?</p>
+        </div>
+      </div>
+      <div class="modal-body" id="modal-body-text">
+        This action cannot be undone.
+      </div>
+      <div class="modal-actions">
+        <button class="secondary-btn" id="modal-btn-cancel">Cancel</button>
+        <button class="danger-btn" id="modal-btn-confirm">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Target Config Modal -->
+  <div class="modal-backdrop" id="api-modal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-icon-blue">
+          <span class="material-symbols-rounded">dns</span>
+        </div>
+        <div>
+          <h3>Configure Backend Target</h3>
+          <p>Switch between Local Django server and Deployed Render instance</p>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="api-url-input" class="form-label">Backend API Base URL</label>
+          <input type="url" id="api-url-input" class="form-input" placeholder="http://127.0.0.1:8000/api">
+          <span class="form-hint">Example Render URL: <code>https://signboard-backend.onrender.com/api</code></span>
+        </div>
+        <div class="quick-api-buttons">
+          <button type="button" class="tag-btn" id="btn-set-local">Use Local (127.0.0.1:8000)</button>
+          <button type="button" class="tag-btn" id="btn-set-render">Use Render Default</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary-btn" id="api-modal-cancel">Close</button>
+        <button class="primary-btn" id="api-modal-save">Save & Reconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Hub -->
+  <div class="toast-hub" id="toast-hub"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
