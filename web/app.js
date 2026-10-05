@@ -3,12 +3,29 @@
  * High-performance state management, live API integration & fallback resilience.
  */
 
+const RENDER_PROD_API = 'https://signboard-backend.onrender.com/api';
+
+function resolveApiBase() {
+  const isHttps = window.location.protocol === 'https:';
+  const isVercel = window.location.hostname.includes('vercel.app');
+  const stored = localStorage.getItem('signboard_api_base');
+  
+  // If on Vercel or remote HTTPS, strictly use live Render cloud
+  if (isHttps || isVercel) {
+    if (!stored || !stored.startsWith('https://')) {
+      localStorage.setItem('signboard_api_base', RENDER_PROD_API);
+      return RENDER_PROD_API;
+    }
+    return stored;
+  }
+  
+  // On localhost:
+  return stored || 'http://127.0.0.1:8000/api';
+}
+
 // State Management
 const STATE = {
-  apiBase: localStorage.getItem('signboard_api_base') || 
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-      ? 'http://127.0.0.1:8000/api' 
-      : 'https://signboard-backend.onrender.com/api'),
+  apiBase: resolveApiBase(),
   authToken: localStorage.getItem('signboard_auth_token') || '',
   adminToken: localStorage.getItem('signboard_admin_token') || '',
   adminUser: JSON.parse(localStorage.getItem('signboard_admin_user') || 'null'),
@@ -182,18 +199,39 @@ function recalculateDistances() {
 // Backend Health Check & Auth
 // ==========================================
 async function checkBackendStatus() {
+  // If on HTTPS and apiBase is http://, auto-upgrade to Render live URL
+  if (window.location.protocol === 'https:' && STATE.apiBase.startsWith('http://')) {
+    STATE.apiBase = RENDER_PROD_API;
+    localStorage.setItem('signboard_api_base', RENDER_PROD_API);
+  }
+
   try {
-    const res = await fetch(`${STATE.apiBase}/categories/`, { signal: AbortSignal.timeout(3500) });
+    const res = await fetch(`${STATE.apiBase}/categories/`, { signal: AbortSignal.timeout(8000) });
     if (res.ok) {
       STATE.isBackendLive = true;
       DOM.apiDot.className = 'status-indicator live';
       DOM.apiLabel.textContent = STATE.apiBase.includes('localhost') || STATE.apiBase.includes('127.0.0.1')
         ? 'Backend: Live (Local)'
-        : 'Backend: Live (Render)';
+        : 'Backend: Live (Render Cloud)';
       return true;
     }
   } catch (err) {
     console.warn('Backend not reachable at:', STATE.apiBase, err);
+  }
+  
+  // Fallback to Render cloud if local failed
+  if (!STATE.apiBase.includes('onrender.com')) {
+    try {
+      const res = await fetch(`${RENDER_PROD_API}/categories/`, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        STATE.apiBase = RENDER_PROD_API;
+        localStorage.setItem('signboard_api_base', RENDER_PROD_API);
+        STATE.isBackendLive = true;
+        DOM.apiDot.className = 'status-indicator live';
+        DOM.apiLabel.textContent = 'Backend: Live (Render Cloud)';
+        return true;
+      }
+    } catch (_) {}
   }
   
   STATE.isBackendLive = false;

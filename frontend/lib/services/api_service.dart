@@ -28,9 +28,12 @@ class ApiService {
   static const String defaultLiveUrl = 'https://signboard-backend.onrender.com/api';
 
   // Base URL auto-resolution:
-  // Defaults to live production Render cloud backend, while allowing local overrides via Profile -> Server Configuration
+  // Defaults to live production Render cloud backend, and ignores stale localhost/emulator entries
   String get baseUrl {
-    if (_customBaseUrl != null && _customBaseUrl!.isNotEmpty) {
+    if (_customBaseUrl != null &&
+        _customBaseUrl!.isNotEmpty &&
+        !_customBaseUrl!.contains('10.0.2.2') &&
+        !_customBaseUrl!.contains('127.0.0.1')) {
       return _customBaseUrl!;
     }
     return defaultLiveUrl;
@@ -56,7 +59,16 @@ class ApiService {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _authToken = prefs.getString(_tokenKey);
-    _customBaseUrl = prefs.getString(_customBaseUrlKey);
+    final savedUrl = prefs.getString(_customBaseUrlKey);
+    if (savedUrl != null &&
+        !savedUrl.contains('10.0.2.2') &&
+        !savedUrl.contains('127.0.0.1') &&
+        savedUrl.startsWith('https://')) {
+      _customBaseUrl = savedUrl;
+    } else {
+      _customBaseUrl = defaultLiveUrl;
+      await prefs.setString(_customBaseUrlKey, defaultLiveUrl);
+    }
     final userJson = prefs.getString(_userKey);
     if (userJson != null) {
       try {
