@@ -2,6 +2,13 @@
 
 A high-performance hyperlocal service & signboard discovery platform inspired by the Figma design (`SignBoard`), engineered to scale to **1,000,000+ concurrent users** without bottlenecks.
 
+### 🌐 Live Deployments
+- **Live Web App (Vercel):** [https://web-lyart-rho-35.vercel.app](https://web-lyart-rho-35.vercel.app)
+- **Live Backend API (Render):** [https://signboard-backend.onrender.com/api/](https://signboard-backend.onrender.com/api/)
+- **Live Categories Endpoint:** [https://signboard-backend.onrender.com/api/categories/](https://signboard-backend.onrender.com/api/categories/)
+- **Live 13,000 Posts Feed:** [https://signboard-backend.onrender.com/api/posts/](https://signboard-backend.onrender.com/api/posts/)
+- **GitHub Repository:** [https://github.com/Galib-Mahmud/SignBoard.git](https://github.com/Galib-Mahmud/SignBoard.git)
+
 ---
 
 ## 🚀 Key Features
