@@ -25,15 +25,15 @@ class ApiService {
   static const String _customBaseUrlKey = 'custom_base_url';
   String? _customBaseUrl;
 
+  static const String defaultLiveUrl = 'https://signboard-backend.onrender.com/api';
+
   // Base URL auto-resolution:
-  // Allows user to connect physical phone to Render or local IP, while defaulting to emulator 10.0.2.2
+  // Defaults to live production Render cloud backend, while allowing local overrides via Profile -> Server Configuration
   String get baseUrl {
     if (_customBaseUrl != null && _customBaseUrl!.isNotEmpty) {
       return _customBaseUrl!;
     }
-    if (kIsWeb) return 'http://127.0.0.1:8000/api';
-    if (Platform.isAndroid) return 'http://10.0.2.2:8000/api';
-    return 'http://127.0.0.1:8000/api';
+    return defaultLiveUrl;
   }
 
   Future<void> setCustomBaseUrl(String url) async {
